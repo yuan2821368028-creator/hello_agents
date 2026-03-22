@@ -65,18 +65,22 @@ if __name__ == '__main__':
         ]
 
         print("--- 调用LLM ---")
-        responseText = llmClient.think(exampleMessages)
-        if responseText:
-            print("\n\n--- 完整模型响应 ---")
-            print(responseText)
+        print('按q退出')
+
+        while True:
+            user_input = input("用户：")
+            if user_input == 'q':
+                break
+            exampleMessages.append({"role": "user", "content": user_input})
+            responseText = llmClient.think(exampleMessages)
+
+
+            if responseText:
+                exampleMessages.append({"role": "system", "content": responseText})
+                print("\n\n--- 完整模型响应 ---")
+                print(responseText)
 
     except ValueError as e:
         print(e)
 
->> >
---- 调用LLM - --
-🧠 正在调用
-xxxxxx
-模型...
-✅ 大语言模型响应成功:
-快速排序是一种非常高效的排序算法...
+
