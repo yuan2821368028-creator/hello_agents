@@ -104,7 +104,13 @@ class ReActAgent:
 
     def _parse_action(self, action_text: str):
         """解析Action字符串，提取工具名称和输入。"""
-        match = re.match(r"(\w+)\[(.*)\]", action_text)
+        """
+        \w+ = 抓英文
+        .* = 抓所有东西
+        [ ] 必须加 \ 才能识别
+        ( ) 代表 “我要把这段拿出来
+        ”"""
+        match = re.match(r"(\w+)\[(.*)\]", action_text) #  (.*) - .* = 匹配括号里的所有文字
         if match:
             return match.group(1), match.group(2)
         return None, None
