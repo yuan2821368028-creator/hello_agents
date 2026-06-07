@@ -1,0 +1,36 @@
+# 环境变量 & 敏感文件
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# uv
+uv.lock
+.python-version
