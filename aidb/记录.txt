@@ -1,0 +1,109 @@
+## 模型配置？
+
+
+## 数据源配置？
+
+
+## 提示词工程？
+
+
+## agent编排？
+    ---
+    整体结构
+
+    agent/
+    ├── text2sql/        # 数据库自然语言查询（核心）
+    ├── excel/           # Excel/CSV 文件问答
+    ├── deepagent/       # 深度研究多智能体
+    ├── mcp/             # MCP 协议接口
+    ├── context/         # 对话历史管理
+    ├── middleware/      # 中间件
+    └── common_react_agent.py  # 通用 ReAct Agent
+
+    ---
+    1. text2sql — 数据库问答
+
+    基于 LangGraph 构建的有向图（DAG），执行流程：
+
+    用户问题
+    → datasource_selector（选择数据源）
+    → schema_inspector（获取表结构）
+    → early_recommender（后台预生成推荐问题）
+    → sql_generator（LLM 生成 SQL）
+    → permission_filter（注入行级权限过滤）
+    → sql_executor（执行 SQL）
+    → parallel_collector（并行：chart_generator + summarize）
+    → unified_collector（汇总：摘要 + 图表 + 推荐问题）
+    → END
+
+    子目录职责：
+
+    ┌─────────────┬───────────────────────────────────────────┐
+    │    目录     │                   说明                    │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ sql/        │ SQL 生成                                  │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ database/   │ 数据库连接与查询服务                      │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ rag/        │ RAG 检索（术语表、训练样例）              │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ permission/ │ 行级权限过滤注入                          │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ chart/      │ 图表配置生成                              │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ analysis/   │ 结果汇总与数据渲染（AntV/Apache ECharts） │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ template/   │ Prompt 模板（YAML 配置）                  │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ datasource/ │ 多数据源选择                              │
+    ├─────────────┼───────────────────────────────────────────┤
+    │ dynamic/    │ 动态 SQL 生成                             │
+    └─────────────┴───────────────────────────────────────────┘
+
+    ---
+    2. excel — Excel 文件问答
+
+    流程与 text2sql 类似，但数据源是上传的 Excel/CSV 文件，用 DuckDB 在内存中执行 SQL：
+
+    excel_parsing（解析列结构）
+    → early_recommender
+    → sql_generator
+    → sql_executor（DuckDB 执行）
+    → parallel_collector
+    → unified_collector
+    → END
+
+    ---
+    3. deepagent — 深度研究 Agent
+
+    使用 deepagents 框架，采用多阶段执行模式：
+
+    - PLANNING（思考规划）→ EXECUTING（执行工具调用）→ ANSWERING（生成回答/报告）
+    - 思考过程用 <details> 折叠包裹，实时 SSE 流推送
+    - 工具：sql_db_query、sql_db_schema、sql_db_list_tables、sql_db_table_relationship 等
+    - 适合复杂分析任务，会自主规划多步 SQL 查询
+
+    ---
+    4. mcp — MCP 协议接口
+
+    将 Aix-DB 的问答历史能力暴露为 MCP（Model Context Protocol） 工具，供其他 AI 客户端（如 Claude Desktop）调用。
+
+    ---
+    5. context — 对话历史
+
+    conversation_history_manager.py 管理多轮对话的上下文，维护每个会话的消息历史。
+
+    ---
+    核心设计思路：所有 Agent 都基于 LangGraph 的 StateGraph 构建，状态在节点间流转，支持并行节点（parallel_collector）提升响应速度，通过 SSE 流式推送结果给前端。
+
+
+
+## 记忆管理？
+
+Aix-DB 的对话管理采用多层记忆架构：
+    1.会话级记忆：通过 thread_id + InMemorySaver 实现多轮对话上下文
+    2.持久化记录：所有问答记录保存到 PostgreSQL，支持历史查询
+    3.知识增强记忆：通过 pgvector 存储术语和训练数据，使用向量检索增强回答
+    4.上下文优化：使用 SummarizationMiddleware 和 ContextEditingMiddleware 管理Token消耗
+
+

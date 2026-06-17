@@ -1,0 +1,94 @@
+1. 下载项目
+
+2. 安装依赖
+uv sync
+
+source .venv/bin/activate （windows命令：.venv\Scripts\activate）
+
+3. 安装依赖工具
+    1. 安装LangFuse
+        LangFuse 官方提供了自己的 docker-compose，需要单独运行：
+        git clone https://github.com/langfuse/langfuse.git
+        cd langfuse
+        docker compose up -d
+        启动后访问 http://localhost:3000，创建账号后拿到密钥填入 .env.dev。
+
+    2. 安装minio（端口 9008 避免与 LangFuse 的 MinIO 9000 冲突）
+        docker run -d \
+            --name aix-minio \
+            --restart unless-stopped \
+            -p 9008:9000 \
+            -p 9009:9001 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            -v ~/aix-minio-data:/data \
+            minio/minio server /data --console-address ":9001"
+
+        MinIO Console 访问：http://localhost:9009，账号密码均为 minioadmin。
+
+    3. 安装postgresql（端口 5211 避免与 LangFuse 的 PostgreSQL 5432 冲突）
+        docker run -d \
+            --name aix-postgres \
+            --restart unless-stopped \
+            -p 5211:5432 \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -v ~/aix-pg-data:/var/lib/postgresql/data \
+            pgvector/pgvector:pg17
+
+
+4. 数据准备
+    # 连接到 Docker 中的 PostgreSQL（端口 5211）
+    psql -U postgres -h 127.0.0.1 -p 5211
+
+    # 在 psql 里执行：
+    CREATE USER aix_db WITH PASSWORD '1';
+    CREATE DATABASE aix_db OWNER aix_db;
+    \c aix_db
+    CREATE EXTENSION IF NOT EXISTS vector;
+    \q
+
+    然后初始化表结构：
+    psql -U aix_db -h 127.0.0.1 -p 5211 -d aix_db -f D:/aidb/scripts/init_mem.sql
+    psql -U aix_db -h 127.0.0.1 -p 5211 -d aix_db -f D:/aidb/scripts/init_sql.sql
+
+    psql -U aix_db -h 127.0.0.1 -p 5211 -d aix_db -c "SELECT setval('t_user_id_seq', (SELECT MAX(id) FROM t_user));"
+
+    注意：使用 pgvector/pgvector:pg17 镜像已内置 vector 扩展，无需额外安装。
+
+5. 修改.env.dev
+    修改为：
+
+    # 后端服务端口&工作线程
+    SERVER_PORT=8088
+    SERVER_WORKERS=2
+
+    # MINIO（端口 9008，避免与 LangFuse 冲突）
+    MINIO_ENDPOINT=127.0.0.1:9008
+    MINIO_ACCESS_KEY=minioadmin
+    MINIO_SECRET_KEY=minioadmin
+
+    # 数据库（Docker PostgreSQL，端口 5211）
+    SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://aix_db:1@127.0.0.1:5211/aix_db
+
+    # LangFuse（已启动，从 LangFuse UI 获取实际密钥）
+    LANGFUSE_TRACING_ENABLED="true"
+    LANGFUSE_SECRET_KEY="sk-lf-4bf2a844-4a9c-4626-af69-0cae99bf2bfb"
+    LANGFUSE_PUBLIC_KEY="pk-lf-8aff3c29-3239-4a52-8028-bacc185f6c22"
+    LANGFUSE_BASE_URL="http://localhost:3000"
+
+6. 启动项目
+    ---
+    # 后端
+    cd /Users/jiang/BdProject/Aix-DB
+    python serv.py
+
+    # 前端（另开终端）
+    cd web
+    npm install
+    npm run dev
+
+    ---
+
+    # MCP Server（可选）
+    bash scripts/start_mcp.sh
